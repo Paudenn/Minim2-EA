@@ -6,6 +6,7 @@ import 'package:ea_frontend/models/user.dart';
 import 'package:ea_frontend/views/event_page.dart';
 import 'package:ea_frontend/views/widgets/calendar.dart';
 import 'package:ea_frontend/views/widgets/map.dart';
+import 'package:ea_frontend/views/widgets/map_by_distance.dart';
 import 'package:flutter/material.dart';
 import 'package:localstorage/localstorage.dart';
 
