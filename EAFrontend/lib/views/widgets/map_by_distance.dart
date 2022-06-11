@@ -12,8 +12,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:localstorage/localstorage.dart';
 import 'package:pr_geo/pr_geo.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:ea_frontend/main.dart';
-import 'package:flutter_settings_screens/flutter_settings_screens.dart';
+import 'package:ea_frontend/views/home.dart';
 
 import '../../models/location.dart';
 import '../event_page.dart';
@@ -57,6 +56,7 @@ Future<Position> _determinePosition() async {
       // Android's shouldShowRequestPermissionRationale
       // returned true. According to Android guidelines
       // your App should show an explanatory UI now.
+
       return Future.error('Location permissions are denied');
     }
   }
@@ -72,6 +72,9 @@ Future<Position> _determinePosition() async {
   return await Geolocator.getCurrentPosition();
 }
 
+int range = 700000;
+bool changeDistance = false;
+
 class _BuildMapState extends State<BuildMapDistance> {
   final PopupController _popupController = PopupController();
   List<Marker> markers = [];
@@ -81,6 +84,7 @@ class _BuildMapState extends State<BuildMapDistance> {
   int pointIndex = 0;
   LatLng centerPoint = LatLng(0.0, 0.0);
   List points = [];
+
   String id = LocalStorage('BookHub').getItem('userId');
 
   Future<bool> getEvents() async {
@@ -110,7 +114,7 @@ class _BuildMapState extends State<BuildMapDistance> {
       double totalDistance =
           PR_Geo.distance(pointUser, pointEvent); // distancia en metros
 
-      if (totalDistance <= 700000) {
+      if (totalDistance <= range) {
         markers.add(Marker(
           anchorPos: AnchorPos.align(AnchorAlign.center),
           height: 30,
@@ -144,13 +148,13 @@ class _BuildMapState extends State<BuildMapDistance> {
     return false;
   }
 
-  String dropdownValue = 'One';
+  String dropdownValue = '700Km';
   Widget buildLocationDistance(context, Function reload) {
     return DropdownButton<String>(
       value: dropdownValue,
       icon: const Icon(Icons.arrow_downward),
       elevation: 16,
-      style: const TextStyle(color: Colors.deepPurple),
+      style: const TextStyle(color: Colors.red),
       underline: Container(
         height: 2,
         color: Colors.deepPurpleAccent,
@@ -158,9 +162,22 @@ class _BuildMapState extends State<BuildMapDistance> {
       onChanged: (String? newValue) {
         setState(() {
           dropdownValue = newValue!;
+          if (newValue == '700Km') {
+            range = 700000;
+          } else if (newValue == '1000Km') {
+            range = 1000000;
+          } else if (newValue == '5000Km') {
+            range = 5000000;
+          } else if (newValue == 'All') {
+            range = 12742000;
+          } else if (newValue == '100Km') {
+            range = 100000;
+          }
+          changeDistance = true;
+          reload();
         });
       },
-      items: <String>['One', 'Two', 'Free', 'Four']
+      items: <String>['100Km', '700Km', '1000Km', '5000Km', 'All']
           .map<DropdownMenuItem<String>>((String value) {
         return DropdownMenuItem<String>(
           value: value,
@@ -172,10 +189,9 @@ class _BuildMapState extends State<BuildMapDistance> {
 
   @override
   Widget build(BuildContext context) {
-    reload() {
-      Route route =
-          MaterialPageRoute(builder: (context) => const BuildMapDistance());
-      Navigator.pop(context, route);
+    Future<void> reload() async {
+      Route route = MaterialPageRoute(builder: (context) => BuildMapDistance());
+      Navigator.push(context, route);
     }
 
     return FutureBuilder(
@@ -216,7 +232,34 @@ class _BuildMapState extends State<BuildMapDistance> {
                       subdomains: ['a', 'b', 'c'],
                     ),
                   ),
-                  buildLocationDistance(context, reload),
+                  Column(
+                    children: [
+                      buildLocationDistance(context, reload),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      FloatingActionButton(
+                          heroTag: range++,
+                          backgroundColor: Theme.of(context).indicatorColor,
+                          onPressed: () {
+                            if (changeDistance) {
+                              changeDistance = false;
+                              Route route = MaterialPageRoute(
+                                  builder: (context) => Home());
+
+                              Navigator.of(context)
+                                  .popUntil((route) => route.isFirst);
+                            } else {
+                              Navigator.maybePop(context);
+                            }
+                          },
+                          child: const Icon(Icons.chevron_left_rounded)),
+                    ],
+                  ),
                   MarkerClusterLayerWidget(
                       options: MarkerClusterLayerOptions(
                     spiderfyCircleRadius: 80,
@@ -264,56 +307,52 @@ class _BuildMapState extends State<BuildMapDistance> {
                           color: Colors.black12,
                           borderStrokeWidth: 3),
                       popupOptions: PopupOptions(
-                          popupSnap: PopupSnap.markerTop,
-                          popupController: _popupController,
-                          popupBuilder: (_, marker) => Container(
-                                width: 200,
-                                height: 100,
-                                child: GestureDetector(
-                                  onTap: () => debugPrint('Popup tap!'),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                        border: Border.all(width: 1),
-                                        borderRadius:
-                                            BorderRadius.circular(12.0),
-                                        color:
-                                            Theme.of(context).backgroundColor),
-                                    margin: const EdgeInsets.symmetric(
-                                        horizontal: 8.0, vertical: 4.0),
-                                    child: ListTile(
-                                      title: Text(
-                                        _events[markers.indexOf(marker)].name,
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                      subtitle: Text(
-                                          _events[markers.indexOf(marker)]
-                                                  .eventDate
-                                                  .day
-                                                  .toString() +
-                                              "-" +
-                                              _events[markers.indexOf(marker)]
-                                                  .eventDate
-                                                  .month
-                                                  .toString() +
-                                              "-" +
-                                              _events[markers.indexOf(marker)]
-                                                  .eventDate
-                                                  .year
-                                                  .toString(),
-                                          style:
-                                              TextStyle(color: Colors.black)),
-                                      onTap: () {
-                                        widget.setMainComponent!(EventPage(
-                                            setMainComponent:
-                                                widget.setMainComponent,
-                                            elementId:
-                                                _events[markers.indexOf(marker)]
-                                                    .id));
-                                      },
-                                    ),
-                                  ),
+                        popupSnap: PopupSnap.markerTop,
+                        popupController: _popupController,
+                        popupBuilder: (_, marker) => Container(
+                          width: 200,
+                          height: 100,
+                          child: GestureDetector(
+                            onTap: () => debugPrint('Popup tap!'),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                  border: Border.all(width: 1),
+                                  borderRadius: BorderRadius.circular(12.0),
+                                  color: Theme.of(context).backgroundColor),
+                              margin: const EdgeInsets.symmetric(
+                                  horizontal: 8.0, vertical: 4.0),
+                              child: ListTile(
+                                title: Text(
+                                  _events[markers.indexOf(marker)].name,
+                                  style: TextStyle(color: Colors.black),
                                 ),
-                              )),
+                                subtitle: Text(
+                                    _events[markers.indexOf(marker)]
+                                            .eventDate
+                                            .day
+                                            .toString() +
+                                        "-" +
+                                        _events[markers.indexOf(marker)]
+                                            .eventDate
+                                            .month
+                                            .toString() +
+                                        "-" +
+                                        _events[markers.indexOf(marker)]
+                                            .eventDate
+                                            .year
+                                            .toString(),
+                                    style: TextStyle(color: Colors.black)),
+                                onTap: () {
+                                  widget.setMainComponent!(EventPage(
+                                      setMainComponent: widget.setMainComponent,
+                                      elementId:
+                                          _events[markers.indexOf(marker)].id));
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                       builder: (context, markers) {
                         return Container(
                           decoration: BoxDecoration(
